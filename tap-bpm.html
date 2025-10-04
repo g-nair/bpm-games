@@ -44,6 +44,21 @@
         }
         #tapCircle:active { transform: scale(0.95); background: rgba(26, 26, 26, 0.05); }
         .tap-info { font-size: 0.9rem; font-weight: 300; color: #666; text-align: center; max-width: 280px; }
+        .progress-container {
+            width: 280px; display: flex; flex-direction: column; gap: 8px;
+        }
+        .progress-labels {
+            display: flex; justify-content: space-between; font-size: 0.85rem;
+            font-weight: 300; color: #666;
+        }
+        .progress-bar {
+            width: 100%; height: 2px; background-color: #e0e0e0;
+            position: relative; overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%; background-color: #1a1a1a; width: 0%;
+            transition: width 100ms linear;
+        }
         .hidden { display: none; }
         @media (max-width: 600px) {
             h1 { font-size: 2rem; }
@@ -66,6 +81,15 @@
         <button id="startTap">Start</button>
         <div id="tapCircle" class="hidden"><span style="font-size: 1.2rem; font-weight: 300;">TAP</span></div>
         <div class="tap-info hidden" id="tapInfo">Tap the circle or press any key</div>
+        <div class="progress-container hidden" id="progressContainer">
+            <div class="progress-labels">
+                <span>Start</span>
+                <span>End</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+        </div>
         <div id="tapResult" class="result hidden"></div>
         <button id="playAgain" class="hidden">Play Again</button>
     </div>
@@ -77,35 +101,106 @@
         const targetBpmSpan = document.getElementById('targetBpm');
         const tapResult = document.getElementById('tapResult');
         const playAgainBtn = document.getElementById('playAgain');
-        let tapTimes = [], tapTimeout, targetBPM, tapping = false;
-        function handleTap() { if (!tapping) return; tapTimes.push(Date.now()); }
-        function calculateBPM(times) {
-            if (times.length < 2) return 0;
-            const intervals = [];
-            for (let i = 1; i < times.length; i++) { intervals.push(times[i] - times[i - 1]); }
-            const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-            return Math.round(60000 / avgInterval);
+        const progressContainer = document.getElementById('progressContainer');
+        const progressFill = document.getElementById('progressFill');
+        let tapTimes = [], tapTimeout, targetBPM, tapping = false, progressInterval, timerStarted = false;
+        
+        function startTimer() {
+            if (timerStarted) return;
+            timerStarted = true;
+            
+            const duration = 15000;
+            const updateInterval = 100;
+            let elapsed = 0;
+            
+            progressInterval = setInterval(() => {
+                elapsed += updateInterval;
+                const percentage = (elapsed / duration) * 100;
+                progressFill.style.width = percentage + '%';
+                if (elapsed >= duration) {
+                    clearInterval(progressInterval);
+                }
+            }, updateInterval);
+            
+            tapTimeout = setTimeout(() => {
+                tapping = false;
+                timerStarted = false;
+                clearInterval(progressInterval);
+                tapCircle.classList.add('hidden'); 
+                tapInfo.classList.add('hidden'); 
+                targetBpmDisplay.classList.add('hidden');
+                progressContainer.classList.add('hidden');
+                
+                const result = calculateBPMAndConsistency(tapTimes);
+                const userBPM = result.bpm;
+                const consistency = result.consistency;
+                const diff = Math.abs(targetBPM - userBPM);
+                const score = userBPM === 0 ? 0 : Math.max(0, 100 - (diff / targetBPM * 100));
+                
+                tapResult.innerHTML = '<div class="score">' + score.toFixed(1) + '%</div>' +
+                    '<div>Your BPM: ' + userBPM + ' BPM</div>' +
+                    '<div>Target: ' + targetBPM + ' BPM</div>' +
+                    '<div style="font-size: 0.95rem; margin-top: 10px;">Consistency: ' + consistency.toFixed(1) + '%</div>' +
+                    '<div style="font-size: 0.9rem; color: #666;">Taps: ' + tapTimes.length + '</div>';
+                tapResult.classList.remove('hidden'); 
+                playAgainBtn.classList.remove('hidden');
+            }, duration);
         }
+        
+        function handleTap() { 
+            if (!tapping) return;
+            if (!timerStarted) {
+                startTimer();
+            }
+            tapTimes.push(Date.now()); 
+        }
+        
+        function calculateBPMAndConsistency(times) {
+            if (times.length < 2) return { bpm: 0, consistency: 0 };
+            
+            const intervals = [];
+            for (let i = 1; i < times.length; i++) { 
+                intervals.push(times[i] - times[i - 1]); 
+            }
+            
+            const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+            const bpm = Math.round(60000 / avgInterval);
+            
+            // Calculate standard deviation of intervals
+            const squaredDiffs = intervals.map(interval => Math.pow(interval - avgInterval, 2));
+            const variance = squaredDiffs.reduce((a, b) => a + b, 0) / intervals.length;
+            const stdDev = Math.sqrt(variance);
+            
+            // Calculate coefficient of variation (CV) as percentage
+            const coefficientOfVariation = (stdDev / avgInterval) * 100;
+            
+            // Convert to consistency score (lower CV = higher consistency)
+            // CV of 0% = 100% consistency, CV of 50%+ = 0% consistency
+            const consistency = Math.max(0, Math.min(100, 100 - (coefficientOfVariation * 2)));
+            
+            return { bpm, consistency };
+        }
+        
         startTapBtn.addEventListener('click', () => {
             targetBPM = Math.floor(Math.random() * 121) + 60;
             targetBpmSpan.textContent = targetBPM;
-            tapTimes = []; tapping = true;
+            tapTimes = []; 
+            tapping = true;
+            timerStarted = false;
             startTapBtn.classList.add('hidden');
-            targetBpmDisplay.classList.remove('hidden'); tapCircle.classList.remove('hidden'); tapInfo.classList.remove('hidden');
-            tapTimeout = setTimeout(() => {
-                tapping = false;
-                tapCircle.classList.add('hidden'); tapInfo.classList.add('hidden'); targetBpmDisplay.classList.add('hidden');
-                const userBPM = calculateBPM(tapTimes);
-                const diff = Math.abs(targetBPM - userBPM);
-                const score = userBPM === 0 ? 0 : Math.max(0, 100 - (diff / targetBPM * 100));
-                tapResult.innerHTML = '<div class="score">' + score.toFixed(1) + '%</div><div>Your BPM: ' + userBPM + ' BPM</div><div>Target: ' + targetBPM + ' BPM</div><div style="font-size: 0.9rem; margin-top: 10px; color: #666;">Taps: ' + tapTimes.length + '</div>';
-                tapResult.classList.remove('hidden'); playAgainBtn.classList.remove('hidden');
-            }, 15000);
+            targetBpmDisplay.classList.remove('hidden'); 
+            tapCircle.classList.remove('hidden'); 
+            tapInfo.classList.remove('hidden');
+            progressContainer.classList.remove('hidden');
+            progressFill.style.width = '0%';
         });
+        
         tapCircle.addEventListener('click', handleTap);
         document.addEventListener('keydown', (e) => { if (tapping) { e.preventDefault(); handleTap(); } });
         playAgainBtn.addEventListener('click', () => {
-            tapResult.classList.add('hidden'); playAgainBtn.classList.add('hidden'); startTapBtn.classList.remove('hidden');
+            tapResult.classList.add('hidden'); 
+            playAgainBtn.classList.add('hidden'); 
+            startTapBtn.classList.remove('hidden');
         });
     </script>
 </body>
