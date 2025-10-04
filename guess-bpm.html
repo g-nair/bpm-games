@@ -41,6 +41,23 @@
             width: 150px; font-family: inherit;
         }
         input[type="number"]:focus { outline: none; border-bottom: 2px solid #1a1a1a; }
+        #guessInput {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        .mobile-hint {
+            font-size: 0.85rem;
+            font-weight: 300;
+            color: #999;
+            text-align: center;
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
         .result { text-align: center; font-size: 1.1rem; font-weight: 300; line-height: 1.8; }
         .result .score { font-size: 2rem; font-weight: 400; margin: 10px 0; }
         .hidden { display: none; }
@@ -66,6 +83,7 @@
             <input type="number" id="bpmGuess" placeholder="Enter BPM" min="40" max="200">
             <button id="submitGuess">Submit</button>
         </div>
+        <div id="mobileHint" class="mobile-hint hidden">On mobile? You may need to turn off Silent Mode</div>
         <div id="guessResult" class="result hidden"></div>
         <button id="playAgain" class="hidden">Play Again</button>
     </div>
@@ -100,6 +118,10 @@
             currentBPM = Math.floor(Math.random() * 121) + 60;
             startMetronome(currentBPM);
             playMetronomeBtn.classList.add('hidden'); guessBtn.classList.remove('hidden');
+            // Show mobile hint if on mobile device
+            if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+                document.getElementById('mobileHint').classList.remove('hidden');
+            }
         });
         guessBtn.addEventListener('click', () => {
             guessBtn.classList.add('hidden'); guessInput.classList.remove('hidden'); bpmGuessInput.focus();
@@ -115,6 +137,7 @@
         });
         playAgainBtn.addEventListener('click', () => {
             bpmGuessInput.value = ''; guessResult.classList.add('hidden'); playAgainBtn.classList.add('hidden'); playMetronomeBtn.classList.remove('hidden');
+            document.getElementById('mobileHint').classList.add('hidden');
         });
     </script>
 </body>
