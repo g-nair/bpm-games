@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guess the BPM</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background-color: #faf9f6; color: #1a1a1a; min-height: 100vh;
+            display: flex; flex-direction: column; align-items: center; padding: 40px 20px;
+        }
+        h1 {
+            font-size: 2.5rem; font-weight: 300; letter-spacing: -1px; margin-bottom: 30px;
+            border-bottom: 1px solid #1a1a1a; padding-bottom: 20px;
+        }
+        nav { display: flex; gap: 40px; margin-bottom: 50px; }
+        nav a {
+            color: #1a1a1a; text-decoration: none; font-size: 1rem; font-weight: 300;
+            letter-spacing: 0.5px; padding: 10px 20px; border: 1px solid transparent;
+            transition: all 0.2s ease;
+        }
+        nav a:hover { border: 1px solid #1a1a1a; }
+        nav a.active { border: 1px solid #1a1a1a; }
+        .game {
+            border: 1px solid #1a1a1a; padding: 40px; min-width: 400px;
+            display: flex; flex-direction: column; align-items: center; gap: 30px;
+        }
+        .game h2 { font-size: 1.5rem; font-weight: 300; letter-spacing: -0.5px; }
+        button {
+            background: transparent; border: 1px solid #1a1a1a; padding: 15px 40px;
+            font-size: 1rem; font-weight: 300; cursor: pointer; transition: all 0.2s ease;
+            font-family: inherit; letter-spacing: 0.5px;
+        }
+        button:hover { background: #1a1a1a; color: #faf9f6; }
+        button:active { transform: scale(0.98); }
+        input[type="number"] {
+            border: none; border-bottom: 1px solid #1a1a1a; background: transparent;
+            padding: 10px; font-size: 1.2rem; font-weight: 300; text-align: center;
+            width: 150px; font-family: inherit;
+        }
+        input[type="number"]:focus { outline: none; border-bottom: 2px solid #1a1a1a; }
+        .result { text-align: center; font-size: 1.1rem; font-weight: 300; line-height: 1.8; }
+        .result .score { font-size: 2rem; font-weight: 400; margin: 10px 0; }
+        .hidden { display: none; }
+        @media (max-width: 600px) {
+            h1 { font-size: 2rem; }
+            nav { flex-direction: column; gap: 20px; }
+            .game { min-width: 300px; width: 100%; max-width: 500px; }
+        }
+    </style>
+</head>
+<body>
+    <h1>BPM Games</h1>
+    <nav>
+        <a href="guess-bpm.html" class="active">Guess the BPM</a>
+        <a href="tap-bpm.html">Tap the BPM</a>
+    </nav>
+    <div class="game">
+        <h2>Guess the BPM</h2>
+        <button id="playMetronome">Play Metronome</button>
+        <button id="guessBtn" class="hidden">Guess</button>
+        <div id="guessInput" class="hidden">
+            <input type="number" id="bpmGuess" placeholder="Enter BPM" min="40" max="200">
+            <button id="submitGuess">Submit</button>
+        </div>
+        <div id="guessResult" class="result hidden"></div>
+        <button id="playAgain" class="hidden">Play Again</button>
+    </div>
+    <script>
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioContext, metronomePlaying = false, metronomeInterval, currentBPM;
+        const playMetronomeBtn = document.getElementById('playMetronome');
+        const guessBtn = document.getElementById('guessBtn');
+        const guessInput = document.getElementById('guessInput');
+        const bpmGuessInput = document.getElementById('bpmGuess');
+        const submitGuessBtn = document.getElementById('submitGuess');
+        const guessResult = document.getElementById('guessResult');
+        const playAgainBtn = document.getElementById('playAgain');
+        function playClick() {
+            if (!audioContext) audioContext = new AudioContext();
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            osc.connect(gain); gain.connect(audioContext.destination);
+            osc.frequency.value = 1000; osc.type = 'sine';
+            gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+            osc.start(audioContext.currentTime); osc.stop(audioContext.currentTime + 0.1);
+        }
+        function startMetronome(bpm) {
+            const interval = 60000 / bpm;
+            playClick(); metronomeInterval = setInterval(playClick, interval); metronomePlaying = true;
+        }
+        function stopMetronome() {
+            if (metronomeInterval) { clearInterval(metronomeInterval); metronomePlaying = false; }
+        }
+        playMetronomeBtn.addEventListener('click', () => {
+            currentBPM = Math.floor(Math.random() * 121) + 60;
+            startMetronome(currentBPM);
+            playMetronomeBtn.classList.add('hidden'); guessBtn.classList.remove('hidden');
+        });
+        guessBtn.addEventListener('click', () => {
+            guessBtn.classList.add('hidden'); guessInput.classList.remove('hidden'); bpmGuessInput.focus();
+        });
+        submitGuessBtn.addEventListener('click', () => {
+            const guess = parseInt(bpmGuessInput.value);
+            if (isNaN(guess) || guess < 40 || guess > 200) { alert('Please enter a valid BPM between 40 and 200'); return; }
+            stopMetronome();
+            const diff = Math.abs(currentBPM - guess);
+            const score = Math.max(0, 100 - (diff / currentBPM * 100));
+            guessResult.innerHTML = '<div class="score">' + score.toFixed(1) + '%</div><div>Your guess: ' + guess + ' BPM</div><div>Actual: ' + currentBPM + ' BPM</div>';
+            guessInput.classList.add('hidden'); guessResult.classList.remove('hidden'); playAgainBtn.classList.remove('hidden');
+        });
+        playAgainBtn.addEventListener('click', () => {
+            bpmGuessInput.value = ''; guessResult.classList.add('hidden'); playAgainBtn.classList.add('hidden'); playMetronomeBtn.classList.remove('hidden');
+        });
+    </script>
+</body>
+</html>
